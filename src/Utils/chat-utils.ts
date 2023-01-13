@@ -606,6 +606,22 @@ export const chatModificationToAppPatch = (
 			apiVersion: 1,
 			operation: OP.SET,
 		}
+	} else if('setLabel' in mod) {
+		patch = {
+			syncAction: { labelAssociationAction: { labeled: true } },
+			index: ['label_jid', mod.setLabel.id, jid],
+			type: 'regular',
+			apiVersion: 3,
+			operation: OP.SET
+		}
+	} else if('unsetLabel' in mod) {
+		patch = {
+			syncAction: { labelAssociationAction: { labeled: false } },
+			index: ['label_jid', mod.unsetLabel.id, jid],
+			type: 'regular',
+			apiVersion: 3,
+			operation: OP.SET
+		}
 	} else {
 		throw new Boom('not supported')
 	}
@@ -730,6 +746,18 @@ export const processSyncAction = (
 	} else if(action?.deleteChatAction || type === 'deleteChat') {
 		if(!isInitialSync) {
 			ev.emit('chats.delete', [id])
+		}
+	} else if(action?.labelAssociationAction) {
+		const labelId = `label_jid_${syncAction.index[1]}`
+		const chatId = syncAction.index[2]
+		const labeled = action.labelAssociationAction.labeled
+
+		logger?.info(`chat labels updated: '${chatId}' ${labeled ? 'set' : 'unset'} label ${labelId}'`)
+
+		if(labeled) {
+			ev.emit('labels.chat.add', { labelId, chatId })
+		} else {
+			ev.emit('labels.chat.delete', { labelId, chatId })
 		}
 	} else {
 		logger?.debug({ syncAction, id }, 'unprocessable update')

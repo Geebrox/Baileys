@@ -5,8 +5,10 @@ import { proto } from '../../WAProto'
 import { DEFAULT_CONNECTION_CONFIG } from '../Defaults'
 import type makeMDSocket from '../Socket'
 import type { BaileysEventEmitter, Chat, ConnectionState, Contact, GroupMetadata, PresenceData, WAMessage, WAMessageCursor, WAMessageKey } from '../Types'
+import { Label } from '../Types/Label'
 import { toNumber, updateMessageWithReaction, updateMessageWithReceipt } from '../Utils'
 import { jidNormalizedUser } from '../WABinary'
+import labelsStore from './labels-store'
 import makeOrderedDictionary from './make-ordered-dictionary'
 
 type WASocket = ReturnType<typeof makeMDSocket>
@@ -245,13 +247,16 @@ export default (
 
 	const toJSON = () => ({
 		chats,
+		labels: labelsStore.toJSON(chats),
 		contacts,
 		messages
 	})
 
-	const fromJSON = (json: { chats: Chat[], contacts: { [id: string]: Contact }, messages: { [id: string]: WAMessage[] } }) => {
+	const fromJSON = (json: { chats: Chat[], labels: Label[], contacts: { [id: string]: Contact }, messages: { [id: string]: WAMessage[] } }) => {
 		chats.upsert(...json.chats)
+
 		contactsUpsert(Object.values(json.contacts))
+		labelsStore.fromJSON({ labels: json.labels, chats })
 		for(const jid in json.messages) {
 			const list = assertMessageList(jid)
 			for(const msg of json.messages[jid]) {
@@ -263,6 +268,7 @@ export default (
 
 	return {
 		chats,
+		labels: labelsStore.labels,
 		contacts,
 		messages,
 		groupMetadata,

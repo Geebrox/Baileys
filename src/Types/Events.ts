@@ -5,6 +5,7 @@ import { WACallEvent } from './Call'
 import { Chat, ChatUpdate, PresenceData } from './Chat'
 import { Contact } from './Contact'
 import { GroupMetadata, ParticipantAction } from './GroupMetadata'
+import { Label } from './Label'
 import { MessageUpsertType, MessageUserReceiptUpdate, WAMessage, WAMessageKey, WAMessageUpdate } from './Message'
 import { ConnectionState } from './State'
 
@@ -26,6 +27,16 @@ export type BaileysEventMap = {
     'chats.update': ChatUpdate[]
     /** delete chats with given ID */
     'chats.delete': string[]
+
+    /** upsert labels */
+    'labels.upsert': Label[]
+    /** delete labels with given ID */
+    'labels.delete': string[]
+    /** add label to chat */
+    'labels.chat.add': { labelId: string, chatId: string }
+    /** remove label from chat */
+    'labels.chat.delete': { labelId: string, chatId: string }
+
     /** presence of contact in a chat updated */
     'presence.update': { id: string, presences: { [participant: string]: PresenceData } }
 

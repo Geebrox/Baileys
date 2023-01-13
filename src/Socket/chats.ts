@@ -1,7 +1,9 @@
 import { Boom } from '@hapi/boom'
 import { proto } from '../../WAProto'
 import { PROCESSABLE_HISTORY_TYPES } from '../Defaults'
+import labelsStore from '../Store/labels-store'
 import { ALL_WA_PATCH_NAMES, ChatModification, ChatMutation, LTHashState, MessageUpsertType, PresenceData, SocketConfig, WABusinessHoursConfig, WABusinessProfile, WAMediaUpload, WAMessage, WAPatchCreate, WAPatchName, WAPresence } from '../Types'
+import { Label } from '../Types/Label'
 import { chatModificationToAppPatch, ChatMutationMap, decodePatches, decodeSyncdSnapshot, encodeSyncdPatch, extractSyncdPatches, generateProfilePicture, getHistoryMsg, newLTHashState, processSyncAction } from '../Utils'
 import { makeMutex } from '../Utils/make-mutex'
 import processMessage from '../Utils/process-message'
@@ -376,6 +378,49 @@ export const makeChatsSocket = (config: SocketConfig) => {
 								)
 								states[name] = newState
 								Object.assign(globalMutationMap, mutationMap)
+
+								const labelsToSync: Label[] = []
+								const labeledChats: Record<string, Set<string>> = {}
+
+								Object.entries(mutationMap).forEach(([key, value]) => {
+									if(!key.includes('label')) {
+										return
+									}
+
+									const [index, labelId, chatId] = value.index
+									const { syncAction } = value
+
+									if(!chatId && syncAction.value?.labelEditAction) {
+										labelsToSync.push({
+											name: syncAction.value.labelEditAction.name!,
+											color: syncAction.value.labelEditAction.color!,
+											predefinedId: syncAction.value.labelEditAction.predefinedId!,
+											deleted: syncAction.value.labelEditAction.deleted!,
+											chatIds: new Set()
+										})
+
+										return
+									}
+
+									if(syncAction.value?.labelAssociationAction
+											&& syncAction.value?.labelAssociationAction.labeled) {
+										const labelKey = `${index}${labelId}`
+										if(labeledChats[labelKey]) {
+											labeledChats[labelKey].add(chatId)
+										} else {
+											labeledChats[labelKey] = new Set([chatId])
+										}
+									}
+								})
+
+								labelsToSync.forEach((label) => {
+									const key = `label_jid_${label.predefinedId}`
+									if(labeledChats[key]) {
+										label.chatIds = labeledChats[key]
+									}
+								})
+
+								labelsStore.upsert(labelsToSync)
 
 								logger.info(`restored state of ${name} from snapshot to v${newState.version} with mutations`)
 

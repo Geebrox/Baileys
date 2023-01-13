@@ -1,4 +1,6 @@
+import labelsStore from '../Store/labels-store'
 import { GetCatalogOptions, ProductCreate, ProductUpdate, SocketConfig } from '../Types'
+import { chatModificationToAppPatch } from '../Utils'
 import { parseCatalogNode, parseCollectionsNode, parseOrderDetailsNode, parseProductNode, toProductNode, uploadingNecessaryImagesOfProduct } from '../Utils/business'
 import { BinaryNode, jidNormalizedUser, S_WHATSAPP_NET } from '../WABinary'
 import { getBinaryNodeChild } from '../WABinary/generic-utils'
@@ -268,6 +270,59 @@ export const makeBusinessSocket = (config: SocketConfig) => {
 		}
 	}
 
+	const getLabels = () => {
+		return labelsStore.getLabels()
+	}
+
+	const getLabelById = (id: string) => {
+		return labelsStore.getLabelById(id)
+	}
+
+	const setLabels = async(chatIds: string[], labelIds: string[]) => {
+		try {
+			const promises: Promise<void>[] = []
+
+			chatIds.forEach((chatId) => {
+				labelIds.forEach((id) => {
+					promises.push(
+						sock.appPatch(
+							chatModificationToAppPatch({ setLabel: { id } }, chatId)
+						).catch((error) => config.logger?.error(error))
+					)
+				})
+			})
+
+			await Promise.all(promises)
+		} catch(error) {
+			config.logger?.error(error)
+		}
+	}
+
+	const unsetLabels = async(chatIds: string[], labelIds: string[]) => {
+		try {
+			const promises: Promise<void>[] = []
+
+			chatIds.forEach((chatId) => {
+				labelIds.forEach((id) => {
+					promises.push(
+						sock.appPatch(
+							chatModificationToAppPatch({ unsetLabel: { id } }, chatId)
+						).catch((error) => config.logger?.error(error))
+					)
+				})
+			})
+
+			await Promise.all(promises)
+		} catch(error) {
+			config.logger?.error(error)
+		}
+	}
+
+	sock.ev.on('labels.upsert', labelsStore.upsert.bind(labelsStore))
+	sock.ev.on('labels.delete', labelsStore.deleteById.bind(labelsStore))
+	sock.ev.on('labels.chat.add', labelsStore.addChat.bind(labelsStore))
+	sock.ev.on('labels.chat.delete', labelsStore.deleteChat.bind(labelsStore))
+
 	return {
 		...sock,
 		getOrderDetails,
@@ -275,6 +330,10 @@ export const makeBusinessSocket = (config: SocketConfig) => {
 		getCollections,
 		productCreate,
 		productDelete,
-		productUpdate
+		productUpdate,
+		getLabels,
+		getLabelById,
+		setLabels,
+		unsetLabels
 	}
 }
